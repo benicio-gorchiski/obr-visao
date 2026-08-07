@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <title>Controle OBR</title>
+</head>
+<body>
+    <h2>Testador de Comunicação OBR</h2>
+    
+    <button onclick="conectar()">1. Conectar no Pico</button>
+    <br><br>
+    <button onclick="enviar('PEGAR')">2. Testar "PEGAR" (Liga LED)</button>
+    <button onclick="enviar('SOLTAR')">3. Testar "SOLTAR" (Desliga LED)</button>
+
+    <script>
+        let port;
+        let writer;
+
+        async function conectar() {
+            try {
+                // Pede permissão para acessar o Pico via USB
+                port = await navigator.serial.requestPort();
+                await port.open({ baudRate: 115200 });
+
+                const encoder = new TextEncoderStream();
+                encoder.readable.pipeTo(port.writable);
+                writer = encoder.writable.getWriter();
+                
+                alert("Pico Conectado com Sucesso!");
+            } catch (err) {
+                alert("Erro ao conectar: " + err);
+            }
+        }
+
+        async function enviar(texto) {
+            if (writer) {
+                await writer.write(texto + "\n");
+            } else {
+                alert("Conecte o Pico primeiro!");
+            }
+        }
+    </script>
+</body>
+</html>
