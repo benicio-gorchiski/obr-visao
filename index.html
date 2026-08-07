@@ -2,41 +2,56 @@
 <html lang="pt-br">
 <head>
     <meta charset="UTF-8">
-    <title>Controle OBR</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Teste Web Serial - OBR</title>
+    <style>
+        body { font-family: sans-serif; text-align: center; padding: 20px; background: #222; color: #fff; }
+        button { font-size: 18px; padding: 15px 25px; margin: 10px; border-radius: 8px; border: none; font-weight: bold; }
+        .btn-conn { background: #008CBA; color: white; }
+        .btn-cmd { background: #4CAF50; color: white; }
+        #status { margin-top: 20px; font-size: 16px; color: #ffeb3b; }
+    </style>
 </head>
 <body>
-    <h2>Testador de Comunicação OBR</h2>
+
+    <h2>Teste de Conexão Web -> Pico</h2>
     
-    <button onclick="conectar()">1. Conectar no Pico</button>
+    <button class="btn-conn" onclick="conectarUSB()">1. Conectar USB</button>
     <br><br>
-    <button onclick="enviar('PEGAR')">2. Testar "PEGAR" (Liga LED)</button>
-    <button onclick="enviar('SOLTAR')">3. Testar "SOLTAR" (Desliga LED)</button>
+    <button class="btn-cmd" onclick="enviarComando('LIGAR')">Ligar LED</button>
+    <button class="btn-cmd" onclick="enviarComando('DESLIGAR')">Desligar LED</button>
+
+    <div id="status">Status: Desconectado</div>
 
     <script>
         let port;
         let writer;
 
-        async function conectar() {
+        async function conectarUSB() {
+            const statusDiv = document.getElementById('status');
             try {
-                // Pede permissão para acessar o Pico via USB
+                // Solicita acesso à porta Serial
                 port = await navigator.serial.requestPort();
                 await port.open({ baudRate: 115200 });
 
                 const encoder = new TextEncoderStream();
                 encoder.readable.pipeTo(port.writable);
                 writer = encoder.writable.getWriter();
-                
-                alert("Pico Conectado com Sucesso!");
+
+                statusDiv.innerText = "Status: CONECTADO COM SUCESSO!";
+                statusDiv.style.color = "#4CAF50";
             } catch (err) {
-                alert("Erro ao conectar: " + err);
+                statusDiv.innerText = "Erro ao conectar: " + err;
+                statusDiv.style.color = "#f44336";
             }
         }
 
-        async function enviar(texto) {
+        async function enviarComando(texto) {
             if (writer) {
                 await writer.write(texto + "\n");
+                console.log("Enviado: " + texto);
             } else {
-                alert("Conecte o Pico primeiro!");
+                alert("Conecte a USB primeiro!");
             }
         }
     </script>
