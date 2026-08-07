@@ -3,57 +3,137 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Teste Web Serial - OBR</title>
+    <title>Visão OBR - Controle Robô</title>
     <style>
-        body { font-family: sans-serif; text-align: center; padding: 20px; background: #222; color: #fff; }
-        button { font-size: 18px; padding: 15px 25px; margin: 10px; border-radius: 8px; border: none; font-weight: bold; }
-        .btn-conn { background: #008CBA; color: white; }
-        .btn-cmd { background: #4CAF50; color: white; }
-        #status { margin-top: 20px; font-size: 16px; color: #ffeb3b; }
+        body { 
+            font-family: Arial, sans-serif; 
+            background-color: #1a1a1a; 
+            color: #fff; 
+            text-align: center; 
+            margin: 0;
+            padding: 10px;
+        }
+        #webcam {
+            width: 100%;
+            max-width: 400px;
+            border-radius: 10px;
+            border: 2px solid #4CAF50;
+        }
+        .painel {
+            margin-top: 10px;
+            padding: 10px;
+            background: #333;
+            border-radius: 8px;
+        }
+        button {
+            padding: 12px 20px;
+            font-size: 16px;
+            font-weight: bold;
+            border-radius: 5px;
+            border: none;
+            background-color: #4CAF50;
+            color: white;
+            margin: 5px;
+        }
+        #log {
+            color: #ffeb3b;
+            font-size: 14px;
+            margin-top: 10px;
+        }
     </style>
 </head>
 <body>
 
-    <h2>Teste de Conexão Web -> Pico</h2>
-    
-    <button class="btn-conn" onclick="conectarUSB()">1. Conectar USB</button>
-    <br><br>
-    <button class="btn-cmd" onclick="enviarComando('LIGAR')">Ligar LED</button>
-    <button class="btn-cmd" onclick="enviarComando('DESLIGAR')">Desligar LED</button>
+    <h2>Visão Computacional OBR</h2>
 
-    <div id="status">Status: Desconectado</div>
+    <video id="webcam" autoplay playsinline muted></video>
+
+    <div class="painel">
+        <button onclick="iniciarCamera()">1. Iniciar Câmera & Foco</button>
+        <button onclick="simularIA('GIRA_ESQ')">Testar Gira Esq</button>
+        <button onclick="simularIA('PEGAR')">Testar Pegar</button>
+    </div>
+
+    <div id="log">Status: Aguardando início...</div>
 
     <script>
-        let port;
-        let writer;
+        let videoTrack = null;
 
-        async function conectarUSB() {
-            const statusDiv = document.getElementById('status');
+        // --- 1. CONFIGURAÇÃO DA CÂMERA E FOCO ---
+        async function iniciarCamera() {
+            const video = document.getElementById('webcam');
+            const log = document.getElementById('log');
+
             try {
-                // Solicita acesso à porta Serial
-                port = await navigator.serial.requestPort();
-                await port.open({ baudRate: 115200 });
+                // Solicita a câmera traseira do Poco X3 em alta taxa de quadros
+                const stream = await navigator.mediaDevices.getUserMedia({
+                    video: { 
+                        facingMode: { exact: "environment" },
+                        width: { ideal: 640 },
+                        height: { ideal: 480 }
+                    }
+                });
 
-                const encoder = new TextEncoderStream();
-                encoder.readable.pipeTo(port.writable);
-                writer = encoder.writable.getWriter();
+                video.srcObject = stream;
+                videoTrack = stream.getVideoTracks()[0];
 
-                statusDiv.innerText = "Status: CONECTADO COM SUCESSO!";
-                statusDiv.style.color = "#4CAF50";
+                // Aplica a trava de foco e exposição (se suportado pelo hardware)
+                const capabilities = videoTrack.getCapabilities();
+                const settings = {};
+
+                if (capabilities.focusMode && capabilities.focusMode.includes('continuous')) {
+                    settings.focusMode = 'continuous'; // Ou 'fixed' para travar
+                }
+
+                if (Object.keys(settings).length > 0) {
+                    await videoTrack.applyConstraints({ advanced: [settings] });
+                }
+
+                log.innerText = "Câmera pronta e foco ajustado!";
             } catch (err) {
-                statusDiv.innerText = "Erro ao conectar: " + err;
-                statusDiv.style.color = "#f44336";
+                // Fallback caso falhe ao pegar exatamente a câmera traseira
+                try {
+                    const fallbackStream = await navigator.mediaDevices.getUserMedia({ video: true });
+                    video.srcObject = fallbackStream;
+                    log.innerText = "Câmera iniciada (modo básico).";
+                } catch (e) {
+                    log.innerText = "Erro ao acessar a câmera: " + err;
+                }
             }
         }
 
-        async function enviarComando(texto) {
-            if (writer) {
-                await writer.write(texto + "\n");
-                console.log("Enviado: " + texto);
-            } else {
-                alert("Conecte a USB primeiro!");
+        // --- 2. COMUNICAÇÃO VIA SERVIDOR LOCAL (HTTP) ---
+        async function enviarComando(comando) {
+            const log = document.getElementById('log');
+            try {
+                // Envia a instrução para a ponte local no Android
+                await fetch(`http://localhost:8080/cmd?texto=${comando}`);
+                log.innerText = "Comando enviado para o Pico: " + comando;
+            } catch (erro) {
+                log.innerText = "Erro ao enviar via USB: Verifique a ponte HTTP";
             }
         }
+
+        // --- 3. TESTE MANUAL / LÓGICA DA IA ---
+        function simularIA(comando) {
+            enviarComando(comando);
+        }
+
+        /* AQUI ENTRARÁ A SUA IA (Ex: TensorFlow.js / OpenCV.js)
+           Exemplo de como a IA chama o comando:
+           
+           function processarQuadroIA(posicaoX, posicaoY) {
+               if (posicaoX < 200) {
+                   enviarComando("GIRA_ESQ");
+               } else if (posicaoX > 440) {
+                   enviarComando("GIRA_DIR");
+               } else if (posicaoY < 100) {
+                   enviarComando("PEGAR");
+               } else {
+                   enviarComando("AVANCAR");
+               }
+           }
+        */
     </script>
 </body>
 </html>
